@@ -23,7 +23,7 @@ class String
 end
 
 class Config
-  VERSION      = '1.1.3'
+  VERSION      = '1.2.0'
   MESSAGE_FILE = "#{ENV['HOME']}/.iris.messages"
   HISTORY_FILE = "#{ENV['HOME']}/.iris.history"
   IRIS_SCRIPT  = __FILE__
@@ -257,7 +257,7 @@ class IrisFile
       filepath = Config.messagefile_filename
     end
 
-    return [] unless File.exists?(filepath)
+    return [] unless File.exist?(filepath)
 
     begin
       payload = JSON.parse(File.read(filepath))
@@ -308,7 +308,7 @@ class IrisFile
   end
 
   def self.load_reads
-    return [] unless File.exists? Config.readfile_filename
+    return [] unless File.exist? Config.readfile_filename
 
     begin
       read_array = JSON.parse(File.read(Config.readfile_filename))
@@ -334,13 +334,13 @@ class IrisFile
 
   def self.create_message_file
     raise 'Should not try to create message file in test mode!' if $test_corpus_file
-    raise 'Message file exists; refusing to overwrite!' if File.exists?(Config::MESSAGE_FILE)
+    raise 'Message file exists; refusing to overwrite!' if File.exist?(Config::MESSAGE_FILE)
     File.umask(0122)
     File.open(Config::MESSAGE_FILE, 'w') { |f| f.write('[]') }
   end
 
   def self.create_read_file
-    return if File.exists?(Config.readfile_filename)
+    return if File.exist?(Config.readfile_filename)
 
     File.umask(0122)
     File.open(Config.readfile_filename, 'w') { |f| f.write('[]') }
@@ -635,12 +635,12 @@ class Display
 
   def self.topic_header
     author_head = ('AUTHOR' + (' ' * WIDTH))[0..topic_author_width-1]
-    '| ' + ['ID', 'U', 'TIMESTAMP          ', author_head, 'TITLE'].join(' | ')
+    '| ' + [Display.print_index("ID"), 'U', 'TIMESTAMP          ', author_head, 'TITLE'].join(' | ')
   end
 end
 
 class Interface
-  ONE_SHOTS = %w{ compose delete edit freshen help info mark_all_read mark_read next quit reset_display topics unread }
+  ONE_SHOTS = %w{ compose delete edit freshen help info mark_all_read mark_read next quit reset_display search topics unread }
   CMD_MAP = {
     '?'              => 'help',
     'c'              => 'compose',
@@ -666,6 +666,8 @@ class Interface
     'r'              => 'reply',
     'reply'          => 'reply',
     'reset'          => 'reset_display',
+    's'              => 'search',
+    'search'         => 'search',
     't'              => 'topics',
     'topics'         => 'topics',
     'u'              => 'unread',
@@ -878,8 +880,13 @@ class Interface
     cmd = CMD_MAP[cmd] || cmd
     return self.send(cmd.to_sym) if ONE_SHOTS.include?(cmd) && tokens.length == 1
     return show_topic(cmd) if cmd =~ /^\d+$/
+
+    # Special case of 'search' command, so arg can accept 2+ words
+    return search(tokens[1..-1].join(' ')) if cmd == 'search'
+
     # If we've gotten this far, we must have args. Let's handle 'em.
     arg = tokens.last
+
     return reply(arg)     if cmd == 'reply'
     return edit(arg)      if cmd == 'edit'
     return delete(arg)    if cmd == 'delete'
@@ -954,6 +961,40 @@ class Interface
     Display.say
   end
 
+  def search(query = nil)
+    unless query && !query.strip.empty?
+      Display.say "I'm not a nihilist; I can't search for something that is nothing! Include a proper text string to search."
+      return
+    end
+
+    # Trick to insensitive-case search
+    query_lower = query.strip.downcase
+
+    # Filtering topics and messagens that contain the query
+    matching_hashes = Corpus.topics.select do |topic|
+      topic_match = topic.message.downcase.include?(query_lower)
+      reply_match = topic.replies.any? { |r| r.message.downcase.include?(query_lower) }
+
+      topic_match || reply_match
+    end.map(&:hash).to_set
+
+
+    if matching_hashes.empty?
+      Display.say "No topic or message containing: '#{query}'"
+    else
+     Display.say
+     Display.say Display.topic_header
+      # Keep the original index (index + 1)
+      Corpus.topics.each_with_index do |topic, index|
+        if matching_hashes.include?(topic.hash)
+          Display.say topic.to_topic_line(index + 1)
+        end
+      end
+     Display.say
+    end
+
+  end
+
   def help
     Display.flowerbox(
       "Iris v#{Config::VERSION} readline interface",
@@ -961,25 +1002,26 @@ class Interface
       'Commands',
       '========',
       'READING',
-      'topics, t        - List all topics',
-      'unread, u        - List all topics with unread messages',
-      '# (topic id)     - Read specified topic',
-      'next, n          - Read the next unread topic',
-      'mark_read #, m # - Mark the associated topic as read',
-      'mark_all_read    - Mark all messages as read',
-      'help, h, ?       - Display this text',
+      'topics, t                - List all topics',
+      'unread, u                - List all topics with unread messages',
+      'search <text>, s <text>  - Search all topics and messages for a string of text',
+      '# (topic id)             - Read specified topic',
+      'next, n                  - Read the next unread topic',
+      'mark_read #, m #         - Mark the associated topic as read',
+      'mark_all_read            - Mark all messages as read',
+      'help, h, ?               - Display this text',
       '',
       'WRITING',
-      'compose, c       - Add a new topic',
-      'reply #, r #     - Reply to a specific topic',
-      'edit #, e #      - Edit a topic or message',
-      'delete #, d #, undelete # - Delete {u or undelete} a topic or message',
+      'compose, c                 - Add a new topic',
+      'reply #, r #               - Reply to a specific topic',
+      'edit #, e #                - Edit a topic or message',
+      'delete #, d #, undelete #  - Delete {u or undelete} a topic or message',
       '',
       'SCREEN AND FILE UTILITIES',
-      'freshen, f       - Reload to get any new messages',
-      'reset, clear     - Fix screen in case of text corruption',
-      'info, i          - Display Iris version and message stats',
-      'quit, q          - Quit Iris',
+      'freshen, f    - Reload to get any new messages',
+      'reset, clear  - Fix screen in case of text corruption',
+      'info, i       - Display Iris version and message stats',
+      'quit, q       - Quit Iris',
       '',
       'Full documentation available here:',
       'https://github.com/Calamitous/iris/blob/master/README.md',
@@ -1089,7 +1131,7 @@ class Startupper
   end
 
   def self.perform_file_checks
-    unless File.exists?(Config::MESSAGE_FILE)
+    unless File.exist?(Config::MESSAGE_FILE)
       Display.say "You don't have a message file at #{Config::MESSAGE_FILE}."
       response = Readline.readline 'Would you like me to create it for you? (y/n) ', true
 

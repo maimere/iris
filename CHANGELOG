@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0
+* Add "search" functionality.
+* Fix width of ID column on the first line of topic listing (topic_header).
+* Changed File.exists? method to File.exist?, since the former is deprecated.
+
 ## 1.1.3
 * Fixed bug (https://github.com/Calamitous/iris/issues/62) causing errors when running Iris for the first time.  [Thank you, lee2sman!](https://github.com/lee2sman)
 * Fixed bug causing message to be deleted when exiting a message edit without making changes. [Thank you, zack466!](https://github.com/zack466)

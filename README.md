@@ -50,6 +50,7 @@ jimmy_foo@ctrl-c.club>
 
  * [[t]opics](#topics)
  * [[u]nread](#unread)
+ * [[s]earch](#search)
  * [Display topic](#display-topic)
  * [[n]ext](#next)
  * [[c]ompose](#compose)
@@ -101,6 +102,23 @@ jimmy_foo@ctrl-c.club> unread
 ```
 
 The format of the unread topics list is identical to the format of the [topics](#topics) list
+
+---
+
+### [s]earch
+`search <text>, s <text>    - Search all topics and messages for a string of text`
+
+This outputs a list of top-level topics that contain a given string of text on any of the messagens of the topic.
+
+```
+jimmy_foo@ctrl-c.club> search suggest
+
+ | ID | U | TIMESTAMP            | AUTHOR                  | TITLE
+ |  2 | 1 | 2018-01-24T16:22:05Z | jerry_berry@ctrl-c.club | Suggestions for a...
+
+```
+
+The format of the search topics list is identical to the format of the [topics](#topics) list
 
 ---
 
